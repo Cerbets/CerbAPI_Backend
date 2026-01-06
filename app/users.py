@@ -16,7 +16,7 @@ from pwdlib.hashers.argon2 import Argon2Hasher
 import os
 
 hasher = Argon2Hasher()
-Link = "http://localhost:8501/"
+Link = "https://cerbets.streamlit.app/"
 r = redis.Redis(host=os.environ.get("REDIS_URL"), port=11626, decode_responses=True,socket_timeout=5,
     retry_on_timeout=True, password = "tsnviqditIslAImy4w9X3rnvF3IRWlyg")
 SECRET = os.environ.get("JWT_PRIVATE_KEY")
