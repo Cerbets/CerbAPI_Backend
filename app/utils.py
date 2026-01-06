@@ -14,7 +14,7 @@ conf = ConnectionConfig(
     MAIL_SERVER = "smtp.gmail.com",
     MAIL_STARTTLS = False,
     MAIL_SSL_TLS = True,
-
+TIMEOUT = 60,
 )
 
 async def send_verification_email(link: str,email: str):
