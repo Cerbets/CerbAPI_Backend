@@ -22,7 +22,8 @@ class Database:
         self.pool = await asyncpg.create_pool(
             dsn=DATABASE_URL,
             min_size=5,
-            max_size=20
+            max_size=20,
+            statement_cache_size=0
         )
         async with self.pool.acquire() as conn:
          for file in FilesPath:
