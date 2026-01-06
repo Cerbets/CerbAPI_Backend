@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 import uuid
 import asyncpg
+import asyncio
 from pydantic import BaseModel
 from datetime import datetime
 from fastapi import Depends
