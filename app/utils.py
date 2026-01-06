@@ -10,10 +10,11 @@ conf = ConnectionConfig(
     MAIL_PASSWORD = MAIL_SECRET,
     MAIL_FROM = "cerbetsapinoreply@gmail.com",
     MAIL_FROM_NAME = "Cerbets API",
-    MAIL_PORT = 587,
+    MAIL_PORT = 465,
     MAIL_SERVER = "smtp.gmail.com",
-    MAIL_STARTTLS = True,
-    MAIL_SSL_TLS = False,
+    MAIL_STARTTLS = False,
+    MAIL_SSL_TLS = True,
+
 )
 
 async def send_verification_email(link: str,email: str):
