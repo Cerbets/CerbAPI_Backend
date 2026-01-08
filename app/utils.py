@@ -16,7 +16,7 @@ async def send_verification_email(link: str, email: str):
     # Если вы используете onboarding@resend.dev,
     # 'to' может быть ТОЛЬКО вашей личной почтой, на которую вы регали Resend.
     # Для отправки всем нужно подтвердить свой домен.
-    from_email = "Cerbets <cerbetsapinoreply@gmail.com>"
+    from_email = "Cerbets <cerbets.streamlit.app>"
 
     html_content = f"""
     <!DOCTYPE html>
