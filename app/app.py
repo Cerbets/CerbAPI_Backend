@@ -9,7 +9,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from app.images import imagekit
-# from app.ai import router as ai_router .venv\Scripts\activate .venv\Scripts\activate.venv\Scripts\activate .venv\Scripts\activate.venv\Scripts\activate.venv\Scripts\activate
+from app.ai import router as ai_router   # .venv\Scripts\activate .venv\Scripts\activate.venv\Scripts\activate .venv\Scripts\activate.venv\Scripts\activate.venv\Scripts\activate
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()
@@ -23,10 +23,13 @@ openapi_url = "/openapi.json" if SHOW_DOCS else None
 )
 app.include_router(
     users_router,
-   # dependencies=[Depends(current_active_user)]
+    dependencies=[Depends(get_current_user)]
 
 )
-
+app.include_router(
+    ai_router,
+    dependencies=[Depends(get_current_user)]
+)
 @app.post("/upload")
 async def upload_file(
         file: UploadFile = File(...),
@@ -130,7 +133,7 @@ async def delete_post(
 
 
 
-
+#----/trash/-------
 
 # from sqlalchemy.ext.asyncio import AsyncSession
 # from app.schemas import PostCreate,PostResponse, UserCreate, UserUpdate, UserRead

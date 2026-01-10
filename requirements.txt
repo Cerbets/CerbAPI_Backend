@@ -13,3 +13,4 @@ python-jose[cryptography]
 passlib[bcrypt]
 redis
 fastapi-mail
+openai

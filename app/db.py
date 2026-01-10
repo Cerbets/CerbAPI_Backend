@@ -1,10 +1,6 @@
-from collections.abc import AsyncGenerator
-import uuid
+
 import asyncpg
-import asyncio
-from pydantic import BaseModel
-from datetime import datetime
-from fastapi import Depends
+
 from dotenv import load_dotenv
 
 import os
@@ -40,3 +36,13 @@ db = Database()
 async def get_db():
     async with db.pool.acquire() as connection:
         yield connection
+
+
+
+#------/trash/------
+# from collections.abc import AsyncGenerator
+# import uuid
+# import asyncio
+# from pydantic import BaseModel
+# from datetime import datetime
+# from fastapi import Depends

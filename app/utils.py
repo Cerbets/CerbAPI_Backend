@@ -72,7 +72,7 @@ async def send_verification_email(link: str, email: str):
                 </div>
                 <div class="footer">
                     © 2025 Cerbets API Team.<br>
-                    You received this email because you created an account on cerbets.com
+                    You received this email because you created an account on cerbets.streamlit.app
                 </div>
             </div>
         </body>
@@ -82,7 +82,7 @@ async def send_verification_email(link: str, email: str):
         message = MIMEText(html_content, "html")
         message['to'] = email
         message['from'] = "cerbetsapinoreply@gmail.com"
-        message['subject'] = "Подтверждение почты"
+        message['subject'] = "Mail activation"
 
         raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
