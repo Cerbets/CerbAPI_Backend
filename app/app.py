@@ -15,10 +15,16 @@ async def lifespan(app: FastAPI):
     await db.connect()
     yield
     await db.disconnect()
-app = FastAPI(lifespan=lifespan)
+SHOW_DOCS = os.getenv("ENV") != "production"
+app = FastAPI(lifespan=lifespan,
+docs_url = "/docs" if SHOW_DOCS else None,
+redoc_url = "/redoc" if SHOW_DOCS else None,
+openapi_url = "/openapi.json" if SHOW_DOCS else None
+)
 app.include_router(
     users_router,
    # dependencies=[Depends(current_active_user)]
+
 )
 
 @app.post("/upload")
