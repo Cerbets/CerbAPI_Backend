@@ -23,7 +23,6 @@ openapi_url = "/openapi.json" if SHOW_DOCS else None
 )
 app.include_router(
     users_router,
-    dependencies=[Depends(get_current_user)]
 
 )
 app.include_router(
