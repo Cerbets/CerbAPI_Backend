@@ -26,3 +26,14 @@ BEGIN
     RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION change_user_profile_page_link(p_userid UUID, p_link TEXT)
+RETURNS TABLE (id UUID, profile_page TEXT) AS $$
+BEGIN
+    RETURN QUERY
+    UPDATE users
+    SET profile_page = p_link
+    WHERE users.id = p_userid
+    RETURNING users.id, users.profile_page;
+END;
+$$ LANGUAGE plpgsql;

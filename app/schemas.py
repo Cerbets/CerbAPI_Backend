@@ -31,8 +31,12 @@ class PostResponse(BaseModel):
     title: str
     content: str
 
+
+
 class ChatMessage(BaseModel):
     content: str
+class Messageid(BaseModel):
+    message_id: int
 
 class ProfilePageRead(BaseModel):
     url: str

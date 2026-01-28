@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FilesPath = ["users_funcs.sql","post_funcs.sql"]
+FilesPath = ["users_funcs.sql","post_funcs.sql","messages.sql"]
 
 load_dotenv()
 DATABASE_URL = os.environ.get("DATABASE_URL")

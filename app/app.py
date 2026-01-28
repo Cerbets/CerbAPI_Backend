@@ -1,4 +1,5 @@
-from fastapi import FastAPI ,HTTPException,Depends, Form, UploadFile , File, APIRouter
+from fastapi import FastAPI ,HTTPException,Depends, Form, UploadFile , File, APIRouter, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
 from app.users import get_current_user
 from app.db import  db, get_db
 from app.users import router as users_router
@@ -9,7 +10,10 @@ import shutil
 import tempfile
 from pathlib import Path
 from app.images import imagekit
-from app.ai import router as ai_router   # .venv\Scripts\activate .venv\Scripts\activate.venv\Scripts\activate .venv\Scripts\activate.venv\Scripts\activate.venv\Scripts\activate
+from app.ai import router as ai_router
+import redis.asyncio as redis
+import json
+from app.users import get_redis
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()
@@ -19,8 +23,24 @@ SHOW_DOCS = os.getenv("ENV") != "production"
 app = FastAPI(lifespan=lifespan,
 docs_url = "/docs" if SHOW_DOCS else None,
 redoc_url = "/redoc" if SHOW_DOCS else None,
-openapi_url = "/openapi.json" if SHOW_DOCS else None
+openapi_url = "/openapi.json" if SHOW_DOCS else None,
+redirect_slashes=False
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+from app.messages import router as messages_router
+from app.websocket import manager
+#from app.websocket_router import ws_router # используй новое имя
+
+app.include_router(messages_router)
+#app.include_router(ws_router)
+
 app.include_router(
     users_router,
 
@@ -29,6 +49,24 @@ app.include_router(
     ai_router,
     dependencies=[Depends(get_current_user)]
 )
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+
+    print("🚀 КЛИЕНТ ПОДКЛЮЧИЛСЯ!")
+    try:
+        await manager.connect(websocket)
+
+        while True:
+                # Ждем сообщение от клиента (даже если он ничего не шлет)
+                data = await websocket.receive_text()
+                print(f"📩 Пришло от фронта: {data}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        print("🔌 Клиент отключился по-хорошему")
+    except Exception as e:
+        print(f"🔌 Отключено: {e}")
+
+
 @app.post("/upload")
 async def upload_file(
         file: UploadFile = File(...),
@@ -51,14 +89,17 @@ async def upload_file(
             use_unique_file_name=True,
             tags=["backend-upload"]
         )
-        print(type(user))
+        print(user)
+        print(user["id"])
+        print(upload_result.url)
+        print(caption)
        # post = Post(user_id = user,caption=caption, url=upload_result.url, file_name=file.filename, file_type=suffix)
-        user = await session.fetchrow(
+        result = await session.fetchrow(
             "SELECT * FROM add_post($1::uuid,$2,$3)",
-            user,upload_result.url,caption
+            user["id"],upload_result.url,caption
         )
 
-        return user
+        return result
 
     except Exception as e:
         print(f"Error: {e}")
@@ -127,6 +168,52 @@ async def delete_post(
     return {"success": True, "message": "Post deleted successfully"}
 
 
+@app.post("/profile_update")
+async def upload_file(
+        file: UploadFile = File(...),
+        user: User = Depends(get_current_user),
+        session: str = Depends(get_db),
+r: redis.Redis = Depends(get_redis)
+):
+    temp_file_path = None
+    try:
+        suffix = os.path.splitext(file.filename)[1]
+        cached_user = await r.get(f"user:{user['id']}")
+
+        if cached_user:
+            cached_user =  json.loads(cached_user)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            temp_file_path = temp_file.name
+            shutil.copyfileobj(file.file, temp_file)
+        upload_result = await imagekit.files.upload(
+            file=Path(temp_file_path),
+            file_name=file.filename,
+            use_unique_file_name=True,
+            tags=["backend-upload"]
+        )
+        cached_user["profile_page"] = upload_result.url
+        print(cached_user)
+        row= await session.fetchrow(
+            "SELECT * FROM change_user_profile_page_link($1::uuid, $2)",
+            user['id'],
+            upload_result.url
+        )
+        print(row)
+        if not row:
+            raise HTTPException(status_code=400, detail=str("ID NOT FOUND"))
+        await r.setex(f"user:{user['id']}", 7200, json.dumps(cached_user))
+
+        return {"url" :upload_result.url }
+
+    except Exception as e:
+        print(f"Error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+    finally:
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+        await file.close()
 
 
 
@@ -137,7 +224,7 @@ async def delete_post(
 # from sqlalchemy.ext.asyncio import AsyncSession
 # from app.schemas import PostCreate,PostResponse, UserCreate, UserUpdate, UserRead
 
-from websockets import connect
+# from websockets import connect
 
 # from sqlalchemy import select
 # from app.images import imagekit

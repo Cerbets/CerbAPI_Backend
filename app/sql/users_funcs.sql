@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT NOT NULL UNIQUE,
+    profile_page TEXT DEFAULT NULL,
     hashed_password TEXT NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     is_superuser BOOLEAN DEFAULT FALSE,
@@ -22,11 +23,14 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION get_user_for_login(p_email TEXT)
-RETURNS TABLE (id UUID, hashed_password TEXT) AS $$
+RETURNS TABLE (id UUID, hashed_password TEXT,profile_page TEXT) AS $$
 BEGIN
     RETURN QUERY
-    SELECT users.id, users.hashed_password
+    SELECT users.id, users.hashed_password , users.profile_page
     FROM users
     WHERE email = p_email;
 END;
 $$ LANGUAGE plpgsql;
+
+
+

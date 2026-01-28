@@ -1,24 +1,35 @@
 import uuid
 from jose import jwt ,JWTError
-from typing import Optional
 from fastapi import Depends,Request,APIRouter , HTTPException, status,Query
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.responses import RedirectResponse
 import redis.asyncio as redis
 from app.schemas  import UserRegister, UserLogin, VerifyRequest
 from app.db import get_db
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from app.utils import send_verification_email
-import secrets
 load_dotenv()
 from pwdlib.hashers.argon2 import Argon2Hasher
 import os
+import json
 
 hasher = Argon2Hasher()
 Link = "https://cerbets.streamlit.app/"
-r = redis.Redis(host=os.environ.get("REDIS_URL"), port=11626, decode_responses=True,socket_timeout=5,
-    retry_on_timeout=True, password = "tsnviqditIslAImy4w9X3rnvF3IRWlyg")
+redis_pool = redis.ConnectionPool.from_url(
+    os.environ.get("REDIS_URL"),
+    port=11626,
+    password=os.environ.get("REDIS_PASSWORD"),
+    decode_responses=True,
+    socket_timeout=5,
+    retry_on_timeout=True
+)
+
+async def get_redis():
+    client = redis.Redis(connection_pool=redis_pool)
+    try:
+        yield client
+    finally:
+        await client.close()
 SECRET = os.environ.get("JWT_PRIVATE_KEY")
 
 ALGORITHM = "HS256"
@@ -31,6 +42,7 @@ router = APIRouter(
 
 
 async def rate_limit_by_ip(request: Request):
+        return True
         ip = request.client.host
         if request.headers.get("X-Forwarded-For"):
             ip = request.headers.get("X-Forwarded-For").split(",")[0]
@@ -60,7 +72,8 @@ async def verify_email(
         email: str = Query(...),
         code: str = Query(...),
         _=Depends(rate_limit_by_ip),
-        conn=Depends(get_db)
+        conn=Depends(get_db),
+r: redis.Redis = Depends(get_redis)
 ):
     try:
         pending_key = f"pending:user:{email}"
@@ -74,8 +87,7 @@ async def verify_email(
 
         stored_code = decode_val(pending_data.get("code"))
         stored_password = decode_val(pending_data.get("password"))
-        print(stored_code)
-        print(stored_password)
+
         if stored_code != code:
             raise HTTPException(status_code=400, detail="Неверный код подтверждения")
 
@@ -104,7 +116,7 @@ async def verify_email(
 
 
 @router.post("/register", status_code=201)
-async def register(user_data: UserRegister,      _=Depends(rate_limit_by_ip), conn=Depends(get_db)  ):
+async def register(user_data: UserRegister,      _=Depends(rate_limit_by_ip), conn=Depends(get_db)  , r: redis.Redis = Depends(get_redis)):
     hashed_pw = hasher.hash(user_data.password)
     query = "SELECT email FROM users WHERE email = $1"
 
@@ -133,18 +145,17 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     conn=Depends(get_db)
 ,      _=Depends(rate_limit_by_ip),
+r: redis.Redis = Depends(get_redis)
 ):
     try:
         user = await conn.fetchrow(
             "SELECT * FROM get_user_for_login($1)",
             form_data.username
         )
-
         if not user:
             raise HTTPException(status_code=400, detail="Wrong username or password")
-
-
         user_id = user["id"]
+        user_profile_page = user["profile_page"]
         hashed_pw = user["hashed_password"]
 
         if not hasher.verify(form_data.password, hashed_pw):
@@ -155,13 +166,19 @@ async def login(
             "sub": str(user_id),
             "exp": expire
         }
-
+        user_data = {
+            "id": str(user["id"]),
+            "mail":form_data.username,
+            "profile_page": user_profile_page,
+        }
+        await r.setex(f"user:{user['id']}", 7200, json.dumps(user_data))
         token = jwt.encode(payload, SECRET, algorithm=ALGORITHM)
 
         return {
             "access_token": token,
             "token_type": "bearer",
             "id": str(user_id),
+            "profile_page": user_profile_page,
         }
 
 
@@ -170,7 +187,7 @@ async def login(
         raise HTTPException(status_code=500, detail="Login failed")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-async def get_current_user(token: str = Depends(oauth2_scheme)  ,      _=Depends(rate_limit_by_ip), ):
+async def get_current_user(token: str = Depends(oauth2_scheme)  ,      _=Depends(rate_limit_by_ip), r: redis.Redis = Depends(get_redis)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -181,8 +198,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme)  ,      _=Depends
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
+        cached_user = await r.get(f"user:{user_id}")
 
-        return user_id
+        if cached_user:
+            return json.loads(cached_user)
+        return cached_user
     except JWTError:
         raise credentials_exception
 
